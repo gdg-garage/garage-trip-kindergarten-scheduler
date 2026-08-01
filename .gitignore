@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+schedule.csv
+credentials.json
+.DS_Store

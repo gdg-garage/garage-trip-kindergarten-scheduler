@@ -1,0 +1,68 @@
+parents:
+  - name: "Vit"
+    partner: "Eva"
+    available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+  - name: "Eva"
+    partner: "Vit"
+    available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+  - name: "Ales"
+    partner: "Zuzka"
+    available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+  - name: "Zuzka"
+    partner: "Ales"
+    available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+  - name: "Harry"
+    partner: "Klara"
+    available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+  - name: "Klara"
+    partner: "Harry"
+    available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+  - name: "David"
+    partner: "Bara"
+    available_days: ["Wed", "Thu", "Fri"]
+  - name: "Bara"
+    partner: "David"
+    available_days: ["Wed", "Thu"]  # Leaving Thursday evening, not present Friday
+    unavailable_shifts:
+      - day: "Thu"
+        shift_ids: [2, 3]  # After lunch on Thursday (Shift 3: 14:00-16:00, Shift 4: 16:00-18:00)
+
+schedule:
+  days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+  shift_blocks:
+    - id: 0
+      name: "Shift 1"
+      start: "09:00"
+      end: "11:00"
+    - id: 1
+      name: "Shift 2"
+      start: "11:00"
+      end: "13:00"
+    - id: 2
+      name: "Shift 3"
+      start: "14:00"
+      end: "16:00"
+    - id: 3
+      name: "Shift 4"
+      start: "16:00"
+      end: "18:00"
+  parents_per_shift: 2
+
+constraints:
+  max_shifts_per_day: 2
+  disallow_consecutive_shifts: true
+  couple_policy:
+    early_week_disallow: true     # Sun-Tue: strict couple separation
+    early_week_days: ["Sun", "Mon", "Tue"]
+    late_week_preference_weight: 0 # Wed-Fri: 0 = neutral/allowed
+  weights:
+    fairness_weight: 100           # Minimize variance in shifts worked per available day
+    pair_diversity_weight: 10      # Minimize repeated pairings of the same parent pair
+    daily_balance_weight: 5        # Prefer 1 shift per day over 2 shifts where possible
+
+google_sheets:
+  spreadsheet_id: "1o7tnLVmnRkw0-ZRX5nwLHS8n1dNtfe-AvP7hHmtz_2U"
+  sheet_name: "Schedule"
+  time_col: "Time"
+  parent1_col: "Parent 1"
+  parent2_col: "Parent 2"

@@ -1,0 +1,247 @@
+import os
+import csv
+from typing import List, Dict, Tuple, Optional
+import gspread
+from google.oauth2.service_account import Credentials
+
+from src.models import (
+    ScheduleConfig,
+    ShiftAssignment,
+    ShiftBlock
+)
+
+
+def _generate_30min_slots_for_shift(shift: ShiftBlock) -> List[Tuple[str, str]]:
+    """
+    Generates 30-minute (start_time, end_time) tuples for a 2-hour shift block.
+    Example: 09:00-11:00 -> [('09:00', '09:30'), ('09:30', '10:00'), ('10:00', '10:30'), ('10:30', '11:00')]
+    """
+    start_h, start_m = map(int, shift.start.split(":"))
+    end_h, end_m = map(int, shift.end.split(":"))
+
+    slots = []
+    curr_h, curr_m = start_h, start_m
+
+    while (curr_h < end_h) or (curr_h == end_h and curr_m < end_m):
+        next_h = curr_h
+        next_m = curr_m + 30
+        if next_m >= 60:
+            next_h += 1
+            next_m -= 60
+
+        slot_start_str = f"{curr_h:02d}:{curr_m:02d}"
+        slot_end_str = f"{next_h:02d}:{next_m:02d}"
+        slots.append((slot_start_str, slot_end_str))
+
+        curr_h, curr_m = next_h, next_m
+
+    return slots
+
+
+def assignments_to_30min_rows(
+    assignments: List[ShiftAssignment],
+    config: ScheduleConfig
+) -> List[Dict[str, str]]:
+    """
+    Converts 2-hour shift assignments into 30-minute interval table rows suitable for Google Sheets / CSV export.
+    Includes lunch break rows (13:00 - 14:00) with empty/Lunch parent cells.
+    """
+    rows: List[Dict[str, str]] = []
+    assignment_map = {(a.day, a.shift_id): a for a in assignments}
+
+    for day in config.schedule.days:
+        for s in sorted(config.schedule.shift_blocks, key=lambda b: b.id):
+            # If there is a gap before this shift (e.g. lunch break 13:00 - 14:00)
+            if s.id == 2:  # Shift 3 starts at 14:00, Shift 2 ended at 13:00
+                rows.append({
+                    "Day": day,
+                    "Time": "13:00 - 13:30",
+                    "Parent 1": "LUNCH BREAK",
+                    "Parent 2": "LUNCH BREAK"
+                })
+                rows.append({
+                    "Day": day,
+                    "Time": "13:30 - 14:00",
+                    "Parent 1": "LUNCH BREAK",
+                    "Parent 2": "LUNCH BREAK"
+                })
+
+            assignment = assignment_map.get((day, s.id))
+            p1 = assignment.parent1 if assignment else ""
+            p2 = assignment.parent2 if assignment else ""
+
+            sub_slots = _generate_30min_slots_for_shift(s)
+            for start_t, end_t in sub_slots:
+                rows.append({
+                    "Day": day,
+                    "Time": f"{start_t} - {end_t}",
+                    "Parent 1": p1,
+                    "Parent 2": p2
+                })
+
+    return rows
+
+
+def parse_30min_rows_to_assignments(
+    rows: List[Dict[str, str]],
+    config: ScheduleConfig
+) -> List[ShiftAssignment]:
+    """
+    Parses 30-minute interval table rows (e.g. from Google Sheet or CSV) back into 2-hour shift assignments.
+    Detects pre-filled/locked slots vs unassigned/empty slots.
+    """
+    # Group rows by Day and Shift ID based on time range
+    slot_parents: Dict[Tuple[str, int], List[Tuple[str, str]]] = {}
+
+    for row in rows:
+        day = row.get("Day", "").strip()
+        time_slot = row.get("Time", "").strip()
+        p1 = row.get("Parent 1", "").strip()
+        p2 = row.get("Parent 2", "").strip()
+
+        if not day or "LUNCH" in p1.upper() or "LUNCH" in p2.upper():
+            continue
+
+        # Extract start time from Time string (e.g., "09:00 - 09:30" -> "09:00")
+        start_time = time_slot.split("-")[0].strip() if "-" in time_slot else time_slot
+
+        # Match start time to shift block
+        matched_shift: Optional[ShiftBlock] = None
+        for s in config.schedule.shift_blocks:
+            if s.start <= start_time < s.end:
+                matched_shift = s
+                break
+
+        if matched_shift:
+            key = (day, matched_shift.id)
+            if key not in slot_parents:
+                slot_parents[key] = []
+            slot_parents[key].append((p1, p2))
+
+    assignments: List[ShiftAssignment] = []
+
+    for day in config.schedule.days:
+        for s in config.schedule.shift_blocks:
+            key = (day, s.id)
+            parent_pairs = slot_parents.get(key, [])
+
+            # Aggregate parents from 30min rows
+            p1_candidates = [pair[0] for pair in parent_pairs if pair[0] and "LUNCH" not in pair[0].upper()]
+            p2_candidates = [pair[1] for pair in parent_pairs if pair[1] and "LUNCH" not in pair[1].upper()]
+
+            p1 = p1_candidates[0] if p1_candidates else ""
+            p2 = p2_candidates[0] if p2_candidates else ""
+
+            is_locked = bool(p1 and p2)
+
+            assignments.append(
+                ShiftAssignment(
+                    day=day,
+                    shift_id=s.id,
+                    shift_name=s.name,
+                    start=s.start,
+                    end=s.end,
+                    parent1=p1,
+                    parent2=p2,
+                    locked=is_locked
+                )
+            )
+
+    return assignments
+
+
+def export_to_csv(assignments: List[ShiftAssignment], file_path: str, config: ScheduleConfig):
+    """Exports assignments to a CSV file structured by 30-minute rows."""
+    rows = assignments_to_30min_rows(assignments, config)
+    fieldnames = ["Day", "Time", "Parent 1", "Parent 2"]
+
+    with open(file_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def read_from_csv(file_path: str, config: ScheduleConfig) -> List[ShiftAssignment]:
+    """Reads assignments from a CSV file structured by 30-minute rows."""
+    if not os.path.exists(file_path):
+        return []
+
+    rows = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+
+    return parse_30min_rows_to_assignments(rows, config)
+
+
+class GoogleSheetHandler:
+    """
+    Handles read/write operations with Google Sheets API via gspread.
+    """
+
+    def __init__(self, credentials_path: Optional[str] = None):
+        self.credentials_path = credentials_path or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "credentials.json")
+        self.client = None
+
+    def _authenticate(self):
+        if self.client:
+            return
+
+        if not os.path.exists(self.credentials_path):
+            raise FileNotFoundError(
+                f"Google Service Account credentials file not found at: '{self.credentials_path}'. "
+                "Please provide a valid credentials.json file or set GOOGLE_APPLICATION_CREDENTIALS environment variable. "
+                "Alternatively, use --export-csv / --input-csv for local file operations."
+            )
+
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_file(self.credentials_path, scopes=scopes)
+        self.client = gspread.authorize(creds)
+
+    def write_schedule(
+        self,
+        assignments: List[ShiftAssignment],
+        config: ScheduleConfig,
+        spreadsheet_id: Optional[str] = None,
+        sheet_name: str = "Schedule"
+    ):
+        """Writes assignments to the specified Google Sheet."""
+        self._authenticate()
+        sheet_id = spreadsheet_id or (config.google_sheets.spreadsheet_id if config.google_sheets else "")
+        if not sheet_id:
+            raise ValueError("No spreadsheet_id provided in configuration or arguments.")
+
+        spreadsheet = self.client.open_by_key(sheet_id)
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+        except gspread.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows="200", cols="10")
+
+        rows = assignments_to_30min_rows(assignments, config)
+        header = ["Day", "Time", "Parent 1", "Parent 2"]
+        table_data = [header] + [[r["Day"], r["Time"], r["Parent 1"], r["Parent 2"]] for r in rows]
+
+        worksheet.clear()
+        worksheet.update("A1", table_data)
+
+    def read_schedule(
+        self,
+        config: ScheduleConfig,
+        spreadsheet_id: Optional[str] = None,
+        sheet_name: str = "Schedule"
+    ) -> List[ShiftAssignment]:
+        """Reads existing schedule from the specified Google Sheet."""
+        self._authenticate()
+        sheet_id = spreadsheet_id or (config.google_sheets.spreadsheet_id if config.google_sheets else "")
+        if not sheet_id:
+            raise ValueError("No spreadsheet_id provided in configuration or arguments.")
+
+        spreadsheet = self.client.open_by_key(sheet_id)
+        worksheet = spreadsheet.worksheet(sheet_name)
+
+        records = worksheet.get_all_records()
+        return parse_30min_rows_to_assignments(records, config)

@@ -1,0 +1,122 @@
+import pytest
+import yaml
+
+from src.models import ScheduleConfig, ShiftAssignment
+from src.solver import KindergartenScheduler
+
+
+@pytest.fixture
+def sample_config():
+    with open("config.yaml", "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return ScheduleConfig(**data)
+
+
+def test_full_schedule_generation(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    # 6 days * 4 shift blocks = 24 total shift assignments
+    assert len(assignments) == 24
+
+    for a in assignments:
+        assert a.parent1 != ""
+        assert a.parent2 != ""
+        assert a.parent1 != a.parent2
+
+
+def test_availability_constraint(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    for a in assignments:
+        if a.day in ["Sun", "Mon", "Tue"]:
+            assert a.parent1 not in ["David", "Bara"]
+            assert a.parent2 not in ["David", "Bara"]
+
+
+def test_bara_thursday_and_friday_availability(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    for a in assignments:
+        if a.day == "Fri":
+            assert a.parent1 != "Bara", "Bara scheduled on Friday in parent1"
+            assert a.parent2 != "Bara", "Bara scheduled on Friday in parent2"
+        if a.day == "Thu" and a.shift_id in [2, 3]:  # Shifts 3 and 4 (14:00-18:00)
+            assert a.parent1 != "Bara", "Bara scheduled after lunch on Thursday in parent1"
+            assert a.parent2 != "Bara", "Bara scheduled after lunch on Thursday in parent2"
+
+
+def test_max_shifts_per_day(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    daily_counts = {}
+    for a in assignments:
+        for p in [a.parent1, a.parent2]:
+            key = (a.day, p)
+            daily_counts[key] = daily_counts.get(key, 0) + 1
+
+    for (day, p), count in daily_counts.items():
+        assert count <= 2, f"Parent {p} assigned {count} shifts on {day}"
+
+
+def test_no_consecutive_shifts(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    # Group by (day, parent) -> list of shift_ids
+    shifts_by_day_parent = {}
+    for a in assignments:
+        for p in [a.parent1, a.parent2]:
+            key = (a.day, p)
+            if key not in shifts_by_day_parent:
+                shifts_by_day_parent[key] = []
+            shifts_by_day_parent[key].append(a.shift_id)
+
+    for (day, p), shift_ids in shifts_by_day_parent.items():
+        sorted_ids = sorted(shift_ids)
+        for i in range(len(sorted_ids) - 1):
+            assert sorted_ids[i+1] - sorted_ids[i] > 1, f"Parent {p} has consecutive shifts {sorted_ids} on {day}"
+
+
+def test_early_week_couple_policy(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    couples = {
+        "Vit": "Eva", "Eva": "Vit",
+        "Ales": "Zuzka", "Zuzka": "Ales",
+        "Harry": "Klara", "Klara": "Harry",
+        "David": "Bara", "Bara": "David"
+    }
+
+    for a in assignments:
+        if a.day in ["Sun", "Mon", "Tue"]:
+            partner_p1 = couples.get(a.parent1)
+            assert a.parent2 != partner_p1, f"Couple {a.parent1} & {a.parent2} scheduled together on {a.day}"
+
+
+def test_partial_regeneration_locked_slots(sample_config):
+    # Lock Sunday Shift 0 (09:00-11:00) with Vit and Ales
+    locked = [
+        ShiftAssignment(
+            day="Sun",
+            shift_id=0,
+            shift_name="Shift 1",
+            start="09:00",
+            end="11:00",
+            parent1="Vit",
+            parent2="Ales",
+            locked=True
+        )
+    ]
+
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve(locked_assignments=locked)
+
+    # Verify Sunday Shift 0 kept Vit and Ales
+    sun_shift_0 = next(a for a in assignments if a.day == "Sun" and a.shift_id == 0)
+    assert set([sun_shift_0.parent1, sun_shift_0.parent2]) == set(["Vit", "Ales"])
+    assert sun_shift_0.locked is True
