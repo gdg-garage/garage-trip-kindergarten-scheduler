@@ -32,6 +32,11 @@ def main():
         help="Path to export output schedule CSV (default: schedule.csv)"
     )
     parser.add_argument(
+        "--metrics-file",
+        default="metrics.md",
+        help="Path to save schedule metrics report (default: metrics.md)"
+    )
+    parser.add_argument(
         "--sync-gsheet",
         action="store_true",
         help="Sync directly with Google Sheets API (reads existing slots and writes updated schedule)."
@@ -91,7 +96,17 @@ def main():
 
     # Calculate metrics
     report = calculate_metrics(assignments, config)
-    print(format_report_summary(report))
+    summary_str = format_report_summary(report)
+    print(summary_str)
+
+    # Store metrics to file
+    if args.metrics_file:
+        try:
+            with open(args.metrics_file, "w", encoding="utf-8") as f:
+                f.write(summary_str.strip() + "\n")
+            print(f"Metrics saved to file: '{args.metrics_file}'")
+        except Exception as e:
+            print(f"Warning: Could not write metrics to file '{args.metrics_file}': {e}")
 
     # Export CSV
     if args.export_csv:

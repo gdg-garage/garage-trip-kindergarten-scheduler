@@ -56,9 +56,11 @@ constraints:
     early_week_days: ["Sun", "Mon", "Tue"]
     late_week_preference_weight: 0 # Wed-Fri: 0 = neutral/allowed
   weights:
-    fairness_weight: 100           # Minimize variance in shifts worked per available day
-    pair_diversity_weight: 10      # Minimize repeated pairings of the same parent pair
-    daily_balance_weight: 5        # Prefer 1 shift per day over 2 shifts where possible
+    fairness_weight: 100               # Minimize variance in shifts worked per available day
+    pair_diversity_weight: 10          # Minimize repeated pairings of the same parent pair
+    daily_balance_weight: 5            # Prefer 1 shift per day over 2 shifts where possible
+    morning_evening_balance_weight: 15 # Balance morning (shifts 0,1) vs evening (shifts 2,3) per parent
+    eva_avoidance_tie_weight: 1        # Tie-breaker to avoid over-scheduling Eva (has small child)
 
 google_sheets:
   spreadsheet_id: "1o7tnLVmnRkw0-ZRX5nwLHS8n1dNtfe-AvP7hHmtz_2U"

@@ -29,8 +29,10 @@ An intelligent, constraint-optimized shift scheduler for crowd-sourced kindergar
 
 ### Soft Constraints (Optimized via Objective Function)
 1. **Hours Fairness**: Minimizes deviation in total shift hours normalized by available days ($T_{\text{shifts}} / A_{\text{days}}$).
-2. **Pairing Diversity**: Minimizes repeat pairings of the same two parents across the week.
-3. **Daily Spread**: Prefers 1 shift per day over 2 shifts where possible.
+2. **Morning vs. Evening Shift Balance**: Minimizes the absolute difference $|M_p - E_p|$ between Morning shifts (Shifts 1 & 2: 09:00-13:00) and Evening shifts (Shifts 3 & 4: 14:00-18:00) for every parent.
+3. **Eva Tie-Breaker Preference**: In case of a tie between candidate parents, prefers assigning other parents over Eva so she is not over-scheduled (taking care of a small child).
+4. **Pairing Diversity**: Minimizes repeat pairings of the same two parents across the week.
+5. **Daily Spread**: Prefers 1 shift per day over 2 shifts where possible.
 
 ---
 

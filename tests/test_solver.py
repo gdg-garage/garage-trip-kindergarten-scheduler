@@ -98,6 +98,21 @@ def test_early_week_couple_policy(sample_config):
             assert a.parent2 != partner_p1, f"Couple {a.parent1} & {a.parent2} scheduled together on {a.day}"
 
 
+def test_eva_not_overscheduled(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    shift_counts = {}
+    for a in assignments:
+        shift_counts[a.parent1] = shift_counts.get(a.parent1, 0) + 1
+        shift_counts[a.parent2] = shift_counts.get(a.parent2, 0) + 1
+
+    # Eva should not have more shifts than other full-week parents due to tie-breaker
+    six_day_parents = ["Vit", "Ales", "Zuzka", "Harry", "Klara"]
+    max_other_shifts = max(shift_counts[p] for p in six_day_parents)
+    assert shift_counts["Eva"] <= max_other_shifts, f"Eva ({shift_counts['Eva']}) over-scheduled compared to others ({max_other_shifts})"
+
+
 def test_partial_regeneration_locked_slots(sample_config):
     # Lock Sunday Shift 0 (09:00-11:00) with Vit and Ales
     locked = [

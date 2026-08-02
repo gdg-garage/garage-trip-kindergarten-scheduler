@@ -26,10 +26,16 @@ def test_metrics_calculation(sample_config):
     total_assigned = sum(pm.total_shifts for pm in report.parent_metrics)
     assert total_assigned == 48
 
+    # Verify morning + evening shifts equal total shifts for each parent
+    for pm in report.parent_metrics:
+        assert pm.morning_shifts + pm.evening_shifts == pm.total_shifts
+
     # Check that fairness variance is reasonably low (< 0.5)
     assert report.fairness_variance < 0.5
+    assert report.morning_evening_balance_score >= 0.0
 
     # Check report string formatting
     summary_text = format_report_summary(report)
     assert "SCHEDULING METRICS & FAIRNESS REPORT" in summary_text
+    assert "Morning vs Evening Balance" in summary_text
     assert "Vit" in summary_text

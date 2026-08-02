@@ -37,6 +37,8 @@ class WeightsConfig(BaseModel):
     fairness_weight: int = 100
     pair_diversity_weight: int = 10
     daily_balance_weight: int = 5
+    morning_evening_balance_weight: int = 15
+    eva_avoidance_tie_weight: int = 1
 
 
 class ConstraintConfig(BaseModel):
@@ -75,6 +77,8 @@ class ShiftAssignment(BaseModel):
 class ParentMetrics(BaseModel):
     name: str
     total_shifts: int
+    morning_shifts: int
+    evening_shifts: int
     total_hours: float
     available_days_count: float
     shifts_per_available_day: float
@@ -85,3 +89,4 @@ class ScheduleReport(BaseModel):
     parent_metrics: List[ParentMetrics]
     pairing_counts: Dict[Tuple[str, str], int]
     fairness_variance: float
+    morning_evening_balance_score: float

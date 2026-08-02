@@ -186,6 +186,23 @@ class KindergartenScheduler:
                 model.Add(daily_shifts != 2).OnlyEnforceIf(is_two_shifts.Not())
                 objective_terms.append(is_two_shifts * weights.daily_balance_weight)
 
+        # D. Morning vs Evening Balance: Minimize |MorningShifts - EveningShifts| per parent
+        for p in self.parents:
+            morning_shifts = sum(x[(d, s.id, p)] for d in self.days for s in self.shifts if s.id in [0, 1])
+            evening_shifts = sum(x[(d, s.id, p)] for d in self.days for s in self.shifts if s.id in [2, 3])
+
+            me_diff = model.NewIntVar(-50, 50, f"me_diff_{p}")
+            model.Add(me_diff == morning_shifts - evening_shifts)
+            abs_me_diff = model.NewIntVar(0, 50, f"abs_me_diff_{p}")
+            model.AddAbsEquality(abs_me_diff, me_diff)
+
+            objective_terms.append(abs_me_diff * weights.morning_evening_balance_weight)
+
+        # E. Tie-Breaker for Eva: Avoid over-scheduling Eva if there is a tie
+        if "Eva" in self.parents and weights.eva_avoidance_tie_weight > 0:
+            eva_total_shifts = sum(x[(d, s.id, "Eva")] for d in self.days for s in self.shifts)
+            objective_terms.append(eva_total_shifts * weights.eva_avoidance_tie_weight)
+
         # Minimize sum of objective penalty terms
         model.Minimize(sum(objective_terms))
 
