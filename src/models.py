@@ -4,7 +4,8 @@ from pydantic import BaseModel, Field
 
 class ShiftRestriction(BaseModel):
     day: str
-    shift_ids: List[int]  # List of shift IDs the parent CANNOT work on that day
+    shift_ids: List[int]  # List of shift IDs affected
+    reason: Optional[str] = None
 
 
 class ParentConfig(BaseModel):
@@ -25,6 +26,7 @@ class ScheduleSettings(BaseModel):
     days: List[str]
     shift_blocks: List[ShiftBlock]
     parents_per_shift: int = 2
+    disabled_shifts: List[ShiftRestriction] = Field(default_factory=list)
 
 
 class CouplePolicy(BaseModel):
@@ -72,6 +74,8 @@ class ShiftAssignment(BaseModel):
     parent1: str
     parent2: str
     locked: bool = False
+    disabled: bool = False
+    reason: Optional[str] = None
 
 
 class ParentMetrics(BaseModel):

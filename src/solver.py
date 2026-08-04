@@ -61,12 +61,22 @@ class KindergartenScheduler:
                 if parents_in_slot:
                     locked_map[key] = parents_in_slot
 
+        # Map disabled/cancelled shifts
+        disabled_map: Dict[Tuple[str, int], str] = {}
+        for disabled_rule in self.config.schedule.disabled_shifts:
+            for s_id in disabled_rule.shift_ids:
+                reason = disabled_rule.reason or "NO SHIFT"
+                disabled_map[(disabled_rule.day, s_id)] = reason
+
         # HARD CONSTRAINTS
 
-        # 1. Capacity: Exactly parents_per_shift assigned to each shift
+        # 1. Capacity: Exactly parents_per_shift assigned to active shifts, 0 for disabled shifts
         for d in self.days:
             for s in self.shifts:
-                model.Add(sum(x[(d, s.id, p)] for p in self.parents) == self.parents_per_shift)
+                if (d, s.id) in disabled_map:
+                    model.Add(sum(x[(d, s.id, p)] for p in self.parents) == 0)
+                else:
+                    model.Add(sum(x[(d, s.id, p)] for p in self.parents) == self.parents_per_shift)
 
         # 2. Availability & Shift Restrictions constraint
         total_available_slots_per_parent = {}
@@ -126,7 +136,7 @@ class KindergartenScheduler:
         objective_terms = []
 
         # A. Fairness Objective: Minimize deviation from expected share of shifts
-        total_slots_needed = len(self.days) * len(self.shifts) * self.parents_per_shift
+        total_slots_needed = sum(1 for d in self.days for s in self.shifts if (d, s.id) not in disabled_map) * self.parents_per_shift
         total_all_avail_slots = sum(total_available_slots_per_parent.values())
         ratio = total_slots_needed / max(1, total_all_avail_slots)
 
@@ -222,23 +232,41 @@ class KindergartenScheduler:
         assignments: List[ShiftAssignment] = []
         for d in self.days:
             for s in self.shifts:
-                assigned_parents = [p for p in self.parents if solver.Value(x[(d, s.id, p)]) == 1]
-                p1 = assigned_parents[0] if len(assigned_parents) > 0 else ""
-                p2 = assigned_parents[1] if len(assigned_parents) > 1 else ""
-
-                is_locked = (d, s.id) in locked_map and set(assigned_parents) == set(locked_map[(d, s.id)])
-
-                assignments.append(
-                    ShiftAssignment(
-                        day=d,
-                        shift_id=s.id,
-                        shift_name=s.name,
-                        start=s.start,
-                        end=s.end,
-                        parent1=p1,
-                        parent2=p2,
-                        locked=is_locked,
+                if (d, s.id) in disabled_map:
+                    reason_text = disabled_map[(d, s.id)]
+                    assignments.append(
+                        ShiftAssignment(
+                            day=d,
+                            shift_id=s.id,
+                            shift_name=s.name,
+                            start=s.start,
+                            end=s.end,
+                            parent1=reason_text,
+                            parent2=reason_text,
+                            locked=True,
+                            disabled=True,
+                            reason=reason_text,
+                        )
                     )
-                )
+                else:
+                    assigned_parents = [p for p in self.parents if solver.Value(x[(d, s.id, p)]) == 1]
+                    p1 = assigned_parents[0] if len(assigned_parents) > 0 else ""
+                    p2 = assigned_parents[1] if len(assigned_parents) > 1 else ""
+
+                    is_locked = (d, s.id) in locked_map and set(assigned_parents) == set(locked_map[(d, s.id)])
+
+                    assignments.append(
+                        ShiftAssignment(
+                            day=d,
+                            shift_id=s.id,
+                            shift_name=s.name,
+                            start=s.start,
+                            end=s.end,
+                            parent1=p1,
+                            parent2=p2,
+                            locked=is_locked,
+                            disabled=False,
+                        )
+                    )
 
         return assignments

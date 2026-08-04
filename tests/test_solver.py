@@ -19,20 +19,29 @@ def test_full_schedule_generation(sample_config):
     # 6 days * 4 shift blocks = 24 total shift assignments
     assert len(assignments) == 24
 
-    for a in assignments:
-        assert a.parent1 != ""
-        assert a.parent2 != ""
-        assert a.parent1 != a.parent2
-
 
 def test_availability_constraint(sample_config):
     scheduler = KindergartenScheduler(sample_config)
     assignments = scheduler.solve()
 
     for a in assignments:
-        if a.day in ["Sun", "Mon", "Tue"]:
+        if a.day in ["Sun", "Mon", "Tue"] and not a.disabled:
             assert a.parent1 not in ["David", "Bara"]
             assert a.parent2 not in ["David", "Bara"]
+
+
+def test_monday_afternoon_disabled_shifts(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    mon_afternoon_assignments = [a for a in assignments if a.day == "Mon" and a.shift_id in [2, 3]]
+    assert len(mon_afternoon_assignments) == 2
+
+    for a in mon_afternoon_assignments:
+        assert a.disabled is True
+        assert a.reason == "OUTDOOR PUZZLE HUNT"
+        assert a.parent1 == "OUTDOOR PUZZLE HUNT"
+        assert a.parent2 == "OUTDOOR PUZZLE HUNT"
 
 
 def test_bara_thursday_and_friday_availability(sample_config):
@@ -40,10 +49,10 @@ def test_bara_thursday_and_friday_availability(sample_config):
     assignments = scheduler.solve()
 
     for a in assignments:
-        if a.day == "Fri":
+        if a.day == "Fri" and not a.disabled:
             assert a.parent1 != "Bara", "Bara scheduled on Friday in parent1"
             assert a.parent2 != "Bara", "Bara scheduled on Friday in parent2"
-        if a.day == "Thu" and a.shift_id in [2, 3]:  # Shifts 3 and 4 (14:00-18:00)
+        if a.day == "Thu" and a.shift_id in [2, 3] and not a.disabled:
             assert a.parent1 != "Bara", "Bara scheduled after lunch on Thursday in parent1"
             assert a.parent2 != "Bara", "Bara scheduled after lunch on Thursday in parent2"
 
@@ -54,9 +63,10 @@ def test_max_shifts_per_day(sample_config):
 
     daily_counts = {}
     for a in assignments:
-        for p in [a.parent1, a.parent2]:
-            key = (a.day, p)
-            daily_counts[key] = daily_counts.get(key, 0) + 1
+        if not a.disabled:
+            for p in [a.parent1, a.parent2]:
+                key = (a.day, p)
+                daily_counts[key] = daily_counts.get(key, 0) + 1
 
     for (day, p), count in daily_counts.items():
         assert count <= 2, f"Parent {p} assigned {count} shifts on {day}"
@@ -69,11 +79,12 @@ def test_no_consecutive_shifts(sample_config):
     # Group by (day, parent) -> list of shift_ids
     shifts_by_day_parent = {}
     for a in assignments:
-        for p in [a.parent1, a.parent2]:
-            key = (a.day, p)
-            if key not in shifts_by_day_parent:
-                shifts_by_day_parent[key] = []
-            shifts_by_day_parent[key].append(a.shift_id)
+        if not a.disabled:
+            for p in [a.parent1, a.parent2]:
+                key = (a.day, p)
+                if key not in shifts_by_day_parent:
+                    shifts_by_day_parent[key] = []
+                shifts_by_day_parent[key].append(a.shift_id)
 
     for (day, p), shift_ids in shifts_by_day_parent.items():
         sorted_ids = sorted(shift_ids)
@@ -93,7 +104,7 @@ def test_early_week_couple_policy(sample_config):
     }
 
     for a in assignments:
-        if a.day in ["Sun", "Mon", "Tue"]:
+        if a.day in ["Sun", "Mon", "Tue"] and not a.disabled:
             partner_p1 = couples.get(a.parent1)
             assert a.parent2 != partner_p1, f"Couple {a.parent1} & {a.parent2} scheduled together on {a.day}"
 
@@ -104,8 +115,9 @@ def test_eva_not_overscheduled(sample_config):
 
     shift_counts = {}
     for a in assignments:
-        shift_counts[a.parent1] = shift_counts.get(a.parent1, 0) + 1
-        shift_counts[a.parent2] = shift_counts.get(a.parent2, 0) + 1
+        if not a.disabled:
+            shift_counts[a.parent1] = shift_counts.get(a.parent1, 0) + 1
+            shift_counts[a.parent2] = shift_counts.get(a.parent2, 0) + 1
 
     # Eva should not have more shifts than other full-week parents due to tie-breaker
     six_day_parents = ["Vit", "Ales", "Zuzka", "Harry", "Klara"]

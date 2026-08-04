@@ -20,6 +20,9 @@ parents:
   - name: "David"
     partner: "Bara"
     available_days: ["Wed", "Thu", "Fri"]
+    unavailable_shifts:
+      - day: "Thu"
+        shift_ids: [2, 3]
   - name: "Bara"
     partner: "David"
     available_days: ["Wed", "Thu"]  # Leaving Thursday evening, not present Friday
@@ -47,6 +50,10 @@ schedule:
       start: "16:00"
       end: "18:00"
   parents_per_shift: 2
+  disabled_shifts:
+    - day: "Mon"
+      shift_ids: [2, 3]  # Monday afternoon (Shifts 3 & 4) cancelled for Outdoor Puzzle Hunt
+      reason: "OUTDOOR PUZZLE HUNT"
 
 constraints:
   max_shifts_per_day: 2

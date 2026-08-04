@@ -99,7 +99,11 @@ def parse_30min_rows_to_assignments(
         p1 = row.get("Parent 1", "").strip()
         p2 = row.get("Parent 2", "").strip()
 
-        if not day or "LUNCH" in p1.upper() or "LUNCH" in p2.upper():
+        if (
+            not day
+            or any(kw in p1.upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+            or any(kw in p2.upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+        ):
             continue
 
         # Extract start time from Time string (e.g., "09:00 - 09:30" -> "09:00")
@@ -118,16 +122,45 @@ def parse_30min_rows_to_assignments(
                 slot_parents[key] = []
             slot_parents[key].append((p1, p2))
 
+    disabled_map = {}
+    for d_rule in config.schedule.disabled_shifts:
+        for s_id in d_rule.shift_ids:
+            disabled_map[(d_rule.day, s_id)] = d_rule.reason or "NO SHIFT"
+
     assignments: List[ShiftAssignment] = []
 
     for day in config.schedule.days:
         for s in config.schedule.shift_blocks:
             key = (day, s.id)
+            if key in disabled_map:
+                reason_text = disabled_map[key]
+                assignments.append(
+                    ShiftAssignment(
+                        day=day,
+                        shift_id=s.id,
+                        shift_name=s.name,
+                        start=s.start,
+                        end=s.end,
+                        parent1=reason_text,
+                        parent2=reason_text,
+                        locked=True,
+                        disabled=True,
+                        reason=reason_text
+                    )
+                )
+                continue
+
             parent_pairs = slot_parents.get(key, [])
 
             # Aggregate parents from 30min rows
-            p1_candidates = [pair[0] for pair in parent_pairs if pair[0] and "LUNCH" not in pair[0].upper()]
-            p2_candidates = [pair[1] for pair in parent_pairs if pair[1] and "LUNCH" not in pair[1].upper()]
+            p1_candidates = [
+                pair[0] for pair in parent_pairs
+                if pair[0] and not any(kw in pair[0].upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+            ]
+            p2_candidates = [
+                pair[1] for pair in parent_pairs
+                if pair[1] and not any(kw in pair[1].upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+            ]
 
             p1 = p1_candidates[0] if p1_candidates else ""
             p2 = p2_candidates[0] if p2_candidates else ""
@@ -143,7 +176,8 @@ def parse_30min_rows_to_assignments(
                     end=s.end,
                     parent1=p1,
                     parent2=p2,
-                    locked=is_locked
+                    locked=is_locked,
+                    disabled=False
                 )
             )
 
