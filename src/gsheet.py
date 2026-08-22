@@ -1,8 +1,12 @@
 import os
 import csv
+import json
 from typing import List, Dict, Tuple, Optional
 import gspread
-from google.oauth2.service_account import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
+from google.oauth2.credentials import Credentials as UserCredentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 
 from src.models import (
     ScheduleConfig,
@@ -212,6 +216,7 @@ def read_from_csv(file_path: str, config: ScheduleConfig) -> List[ShiftAssignmen
 class GoogleSheetHandler:
     """
     Handles read/write operations with Google Sheets API via gspread.
+    Supports both Google OAuth 2.0 User Authentication and Service Account credentials.
     """
 
     def __init__(self, credentials_path: Optional[str] = None):
@@ -222,18 +227,55 @@ class GoogleSheetHandler:
         if self.client:
             return
 
-        if not os.path.exists(self.credentials_path):
-            raise FileNotFoundError(
-                f"Google Service Account credentials file not found at: '{self.credentials_path}'. "
-                "Please provide a valid credentials.json file or set GOOGLE_APPLICATION_CREDENTIALS environment variable. "
-                "Alternatively, use --export-csv / --input-csv for local file operations."
-            )
-
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
-        creds = Credentials.from_service_account_file(self.credentials_path, scopes=scopes)
+
+        token_path = "token.json"
+        creds = None
+
+        # 1. Try loading existing OAuth user token if available
+        if os.path.exists(token_path):
+            try:
+                creds = UserCredentials.from_authorized_user_file(token_path, scopes)
+            except Exception:
+                creds = None
+
+        # Refresh expired token if possible
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+            except Exception:
+                creds = None
+
+        # 2. If no valid user token, check credentials_path
+        if not creds:
+            if not os.path.exists(self.credentials_path):
+                raise FileNotFoundError(
+                    f"Google credentials file not found at: '{self.credentials_path}'. "
+                    "Please provide credentials.json (OAuth Client Secrets or Service Account Key). "
+                    "Alternatively, use --export-csv / --input-csv for local file operations."
+                )
+
+            with open(self.credentials_path, "r", encoding="utf-8") as f:
+                creds_json = json.load(f)
+
+            if "type" in creds_json and creds_json["type"] == "service_account":
+                # Service Account Authentication
+                creds = ServiceAccountCredentials.from_service_account_file(self.credentials_path, scopes=scopes)
+            elif "installed" in creds_json or "web" in creds_json:
+                # OAuth 2.0 User Authentication Flow
+                print("Initiating Google OAuth 2.0 User Authentication...")
+                flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, scopes)
+                creds = flow.run_local_server(port=0)
+                # Save authorized user credentials to token.json
+                with open(token_path, "w", encoding="utf-8") as token_file:
+                    token_file.write(creds.to_json())
+                print(f"OAuth 2.0 authorization successful! User token saved to '{token_path}'.")
+            else:
+                raise ValueError(f"Unrecognized credentials format in '{self.credentials_path}'.")
+
         self.client = gspread.authorize(creds)
 
     def write_schedule(

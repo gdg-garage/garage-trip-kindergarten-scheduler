@@ -128,14 +128,14 @@ If a parent cancels or slots need to be rescheduled:
    ```
    The solver locks all existing entries and solves only the empty slots!
 
-### 4. Syncing Directly with Google Sheets API
+### 4. Syncing Directly with Google Sheets API (OAuth 2.0 or Service Account)
 To read and write directly to Google Sheets:
-1. Download your Google Service Account key as `credentials.json` in the root directory.
-2. Share your Google Sheet (`1o7tnLVmnRkw0-ZRX5nwLHS8n1dNtfe-AvP7hHmtz_2U`) with the service account email.
-3. Run:
-   ```bash
-   ./venv/bin/python3 run.py --sync-gsheet
-   ```
+- **OAuth 2.0 User Login (Recommended)**: Save your OAuth 2.0 Client Secret JSON file as `credentials.json` in the root directory. When you run `./venv/bin/python3 run.py --sync-gsheet`, a browser window opens for a 1-click Google sign-in. The authorized user token is saved locally to `token.json` for future seamless runs!
+- **Service Account**: Save a Google Service Account key file as `credentials.json` and share your Google Sheet (`1o7tnLVmnRkw0-ZRX5nwLHS8n1dNtfe-AvP7hHmtz_2U`) with the service account email.
+- **Execution Command**:
+  ```bash
+  ./venv/bin/python3 run.py --sync-gsheet
+  ```
 
 ---
 
