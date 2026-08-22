@@ -27,7 +27,7 @@ class KindergartenScheduler:
     def solve(
         self,
         locked_assignments: Optional[List[ShiftAssignment]] = None,
-        time_limit_seconds: float = 0.5
+        time_limit_seconds: float = 2.0
     ) -> List[ShiftAssignment]:
         """
         Solves the shift scheduling problem.

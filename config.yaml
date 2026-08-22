@@ -20,15 +20,14 @@ parents:
   - name: "David"
     partner: "Bara"
     available_days: ["Wed", "Thu", "Fri"]
-    unavailable_shifts:
-      - day: "Thu"
-        shift_ids: [2, 3]
   - name: "Bara"
     partner: "David"
-    available_days: ["Wed", "Thu"]  # Leaving Thursday evening, not present Friday
+    available_days: ["Wed", "Thu"]  # Arrives Wed 16.09 at 15:00, leaves Thu 17.09 at 17:00
     unavailable_shifts:
+      - day: "Wed"
+        shift_ids: [0, 1, 2]  # Arrives 15:00 Wed: not available before 16:00 (Shifts 09-11, 11-13, 14-16)
       - day: "Thu"
-        shift_ids: [2, 3]  # After lunch on Thursday (Shift 3: 14:00-16:00, Shift 4: 16:00-18:00)
+        shift_ids: [3]        # Leaves 17:00 Thu: not available after 16:00 (Shift 16-18)
 
 schedule:
   days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]

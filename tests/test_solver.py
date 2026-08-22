@@ -44,17 +44,22 @@ def test_monday_afternoon_disabled_shifts(sample_config):
         assert a.parent2 == "OUTDOOR PUZZLE HUNT"
 
 
-def test_bara_thursday_and_friday_availability(sample_config):
+def test_bara_exact_availability_window(sample_config):
     scheduler = KindergartenScheduler(sample_config)
     assignments = scheduler.solve()
 
     for a in assignments:
-        if a.day == "Fri" and not a.disabled:
-            assert a.parent1 != "Bara", "Bara scheduled on Friday in parent1"
-            assert a.parent2 != "Bara", "Bara scheduled on Friday in parent2"
-        if a.day == "Thu" and a.shift_id in [2, 3] and not a.disabled:
-            assert a.parent1 != "Bara", "Bara scheduled after lunch on Thursday in parent1"
-            assert a.parent2 != "Bara", "Bara scheduled after lunch on Thursday in parent2"
+        if a.disabled:
+            continue
+        if a.day == "Wed" and a.shift_id in [0, 1, 2]:  # Arrives Wed 15:00
+            assert a.parent1 != "Bara", "Bara scheduled before arrival on Wednesday"
+            assert a.parent2 != "Bara", "Bara scheduled before arrival on Wednesday"
+        if a.day == "Thu" and a.shift_id in [3]:  # Leaves Thu 17:00
+            assert a.parent1 != "Bara", "Bara scheduled after departure on Thursday"
+            assert a.parent2 != "Bara", "Bara scheduled after departure on Thursday"
+        if a.day == "Fri":
+            assert a.parent1 != "Bara", "Bara scheduled on Friday"
+            assert a.parent2 != "Bara", "Bara scheduled on Friday"
 
 
 def test_max_shifts_per_day(sample_config):
