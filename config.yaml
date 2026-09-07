@@ -20,6 +20,9 @@ parents:
   - name: "David"
     partner: "Bara"
     available_days: ["Wed", "Thu", "Fri"]
+    unavailable_shifts:
+      - day: "Thu"
+        shift_ids: [2, 3]  # Barcamp on Thursday afternoon (Shifts 14:00-16:00 & 16:00-18:00)
   - name: "Bara"
     partner: "David"
     available_days: ["Wed", "Thu"]  # Arrives Wed 16.09 at 15:00, leaves Thu 17.09 at 17:00

@@ -62,6 +62,16 @@ def test_bara_exact_availability_window(sample_config):
             assert a.parent2 != "Bara", "Bara scheduled on Friday"
 
 
+def test_david_thursday_barcamp_restriction(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    for a in assignments:
+        if a.day == "Thu" and a.shift_id in [2, 3] and not a.disabled:
+            assert a.parent1 != "David", "David scheduled during Barcamp on Thursday"
+            assert a.parent2 != "David", "David scheduled during Barcamp on Thursday"
+
+
 def test_max_shifts_per_day(sample_config):
     scheduler = KindergartenScheduler(sample_config)
     assignments = scheduler.solve()
