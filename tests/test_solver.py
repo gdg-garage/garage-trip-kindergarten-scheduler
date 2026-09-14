@@ -29,8 +29,8 @@ def test_availability_constraint(sample_config):
             assert a.parent1 not in ["David", "Bara"]
             assert a.parent2 not in ["David", "Bara"]
         if a.day in ["Sun", "Mon"] and not a.disabled:
-            assert a.parent1 not in ["Klarka", "Jask"]
-            assert a.parent2 not in ["Klarka", "Jask"]
+            assert a.parent1 not in ["Klara P", "Jask"]
+            assert a.parent2 not in ["Klara P", "Jask"]
 
 
 def test_monday_afternoon_disabled_shifts(sample_config):
@@ -117,9 +117,9 @@ def test_early_week_couple_policy(sample_config):
     couples = {
         "Vit": "Eva", "Eva": "Vit",
         "Ales": "Zuzka", "Zuzka": "Ales",
-        "Harry": "Klara", "Klara": "Harry",
+        "Harry": "Klara V", "Klara V": "Harry",
         "David": "Bara", "Bara": "David",
-        "Klarka": "Jask", "Jask": "Klarka"
+        "Klara P": "Jask", "Jask": "Klara P"
     }
 
     for a in assignments:
@@ -139,7 +139,7 @@ def test_eva_not_overscheduled(sample_config):
             shift_counts[a.parent2] = shift_counts.get(a.parent2, 0) + 1
 
     # Eva should not have more shifts than other full-week parents due to tie-breaker
-    six_day_parents = ["Vit", "Ales", "Zuzka", "Harry", "Klara"]
+    six_day_parents = ["Vit", "Ales", "Zuzka", "Harry", "Klara V"]
     max_other_shifts = max(shift_counts[p] for p in six_day_parents)
     assert shift_counts["Eva"] <= max_other_shifts, f"Eva ({shift_counts['Eva']}) over-scheduled compared to others ({max_other_shifts})"
 

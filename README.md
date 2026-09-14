@@ -18,12 +18,13 @@ An intelligent, constraint-optimized shift scheduler for crowd-sourced kindergar
 ### Hard Constraints (Must Always Be Satisfied)
 1. **Shift Capacity**: Every 2-hour shift block is assigned **exactly 2 parents**.
 2. **Day Availability**:
-   - **Vit, Eva, Ales, Zuzka, Harry, Klara**: Available Sunday through Friday (6 days).
-   - **David, Bara**: Available Wednesday through Friday only (3 days).
+    - **Vit, Eva, Ales, Zuzka, Harry, Klara V**: Available Sunday through Friday (6 days).
+    - **David, Bara**: Available Wednesday through Friday only (3 days).
+    - **Klara P, Jask**: Available Tuesday through Friday (4 days).
 3. **Daily Shift Limit**: A parent can work **at most 2 shifts per day**.
 4. **No Consecutive Shifts**: A parent is **never scheduled for back-to-back shifts** on the same day.
 5. **Early-Week Couple Separation**:
-   - **Sunday – Tuesday**: Parents who are partners (e.g. *Vit & Eva*, *Ales & Zuzka*, *Harry & Klara*) are **never scheduled on the same shift together**, maximizing parent shuffling and adult-to-kid coverage.
+   - **Sunday – Tuesday**: Parents who are partners (e.g. *Vit & Eva*, *Ales & Zuzka*, *Harry & Klara V*, *Klara P & Jask*) are **never scheduled on the same shift together**, maximizing parent shuffling and adult-to-kid coverage.
    - **Wednesday – Friday**: Partners are allowed to share a shift if optimal for fairness/diversity.
 6. **Locked Schedule Support**: Pre-filled slots in Google Sheets / CSV are preserved strictly as immutable constraints.
 
@@ -55,9 +56,9 @@ parents:
     partner: "Ales"
     available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
   - name: "Harry"
-    partner: "Klara"
+    partner: "Klara V"
     available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
-  - name: "Klara"
+  - name: "Klara V"
     partner: "Harry"
     available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
   - name: "David"

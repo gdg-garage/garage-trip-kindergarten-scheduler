@@ -12,9 +12,9 @@ parents:
     partner: "Ales"
     available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
   - name: "Harry"
-    partner: "Klara"
+    partner: "Klara V"
     available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
-  - name: "Klara"
+  - name: "Klara V"
     partner: "Harry"
     available_days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
   - name: "David"
@@ -31,11 +31,11 @@ parents:
         shift_ids: [0, 1, 2]  # Arrives 15:00 Wed: not available before 16:00 (Shifts 09-11, 11-13, 14-16)
       - day: "Thu"
         shift_ids: [3]        # Leaves 17:00 Thu: not available after 16:00 (Shift 16-18)
-  - name: "Klarka"
+  - name: "Klara P"
     partner: "Jask"
     available_days: ["Tue", "Wed", "Thu", "Fri"]  # Arrived Monday evening
   - name: "Jask"
-    partner: "Klarka"
+    partner: "Klara P"
     available_days: ["Tue", "Wed", "Thu", "Fri"]  # Arrived Monday evening
 
 schedule:
