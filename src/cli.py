@@ -37,6 +37,11 @@ def main():
         help="Path to save schedule metrics report (default: metrics.md)"
     )
     parser.add_argument(
+        "--lock-days",
+        nargs="+",
+        help="List of days to lock from existing schedule (e.g. --lock-days Sun Mon). All other days will be regenerated."
+    )
+    parser.add_argument(
         "--sync-gsheet",
         action="store_true",
         help="Sync directly with Google Sheets API (reads existing slots and writes updated schedule)."
@@ -68,9 +73,14 @@ def main():
         sys.exit(1)
 
     existing_assignments = None
+    lock_days = args.lock_days if args.lock_days is not None else config.schedule.locked_days
 
     # Handle Google Sheets sync or CSV input for partial regeneration
     gsheet_handler = None
+    input_file = args.input_csv
+    if not input_file and lock_days and os.path.exists(args.export_csv) and not args.force_fresh and not args.sync_gsheet:
+        input_file = args.export_csv
+
     if args.sync_gsheet:
         gsheet_handler = GoogleSheetHandler(credentials_path=args.creds)
         if not args.force_fresh:
@@ -80,9 +90,21 @@ def main():
                 print(f"Loaded existing schedule from Google Sheet.")
             except Exception as e:
                 print(f"Warning: Could not read existing Google Sheet: {e}")
-    elif args.input_csv and os.path.exists(args.input_csv) and not args.force_fresh:
-        print(f"Loading existing schedule from CSV '{args.input_csv}'...")
-        existing_assignments = read_from_csv(args.input_csv, config)
+    elif input_file and os.path.exists(input_file) and not args.force_fresh:
+        print(f"Loading existing schedule from CSV '{input_file}'...")
+        existing_assignments = read_from_csv(input_file, config)
+
+    # If lock_days is specified, ensure only those days are locked and others are cleared for regeneration
+    if existing_assignments and lock_days and not args.force_fresh:
+        lock_days_set = set(lock_days)
+        print(f"Locking schedule for days: {sorted(lock_days_set)}; regenerating other days...")
+        for a in existing_assignments:
+            if a.day in lock_days_set:
+                a.locked = True
+            else:
+                a.locked = False
+                a.parent1 = ""
+                a.parent2 = ""
 
     # Run CP-SAT Solver
     print("Solving shift schedule using Google OR-Tools CP-SAT...")

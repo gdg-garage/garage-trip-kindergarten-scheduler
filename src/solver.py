@@ -52,6 +52,8 @@ class KindergartenScheduler:
         locked_map: Dict[Tuple[str, int], List[str]] = {}
         if locked_assignments:
             for assignment in locked_assignments:
+                if not assignment.locked:
+                    continue
                 key = (assignment.day, assignment.shift_id)
                 parents_in_slot = []
                 if assignment.parent1 and assignment.parent1 in self.parents:

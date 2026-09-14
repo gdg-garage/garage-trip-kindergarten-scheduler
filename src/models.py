@@ -27,6 +27,7 @@ class ScheduleSettings(BaseModel):
     shift_blocks: List[ShiftBlock]
     parents_per_shift: int = 2
     disabled_shifts: List[ShiftRestriction] = Field(default_factory=list)
+    locked_days: List[str] = Field(default_factory=list)
 
 
 class CouplePolicy(BaseModel):

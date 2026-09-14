@@ -31,6 +31,12 @@ parents:
         shift_ids: [0, 1, 2]  # Arrives 15:00 Wed: not available before 16:00 (Shifts 09-11, 11-13, 14-16)
       - day: "Thu"
         shift_ids: [3]        # Leaves 17:00 Thu: not available after 16:00 (Shift 16-18)
+  - name: "Klarka"
+    partner: "Jask"
+    available_days: ["Tue", "Wed", "Thu", "Fri"]  # Arrived Monday evening
+  - name: "Jask"
+    partner: "Klarka"
+    available_days: ["Tue", "Wed", "Thu", "Fri"]  # Arrived Monday evening
 
 schedule:
   days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
@@ -56,6 +62,7 @@ schedule:
     - day: "Mon"
       shift_ids: [2, 3]  # Monday afternoon (Shifts 3 & 4) cancelled for Outdoor Puzzle Hunt
       reason: "OUTDOOR PUZZLE HUNT"
+  locked_days: ["Sun", "Mon"]  # Preserve existing plan for yesterday and today
 
 constraints:
   max_shifts_per_day: 2

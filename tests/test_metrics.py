@@ -20,7 +20,7 @@ def test_metrics_calculation(sample_config):
     report = calculate_metrics(assignments, sample_config)
 
     assert len(report.assignments) == 24
-    assert len(report.parent_metrics) == 8
+    assert len(report.parent_metrics) == len(sample_config.parents)
 
     # Verify total shifts assigned across all parents matches active shifts * 2 parents
     active_assignments = [a for a in report.assignments if not a.disabled]

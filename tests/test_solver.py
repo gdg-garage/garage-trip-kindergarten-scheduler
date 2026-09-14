@@ -28,6 +28,9 @@ def test_availability_constraint(sample_config):
         if a.day in ["Sun", "Mon", "Tue"] and not a.disabled:
             assert a.parent1 not in ["David", "Bara"]
             assert a.parent2 not in ["David", "Bara"]
+        if a.day in ["Sun", "Mon"] and not a.disabled:
+            assert a.parent1 not in ["Klarka", "Jask"]
+            assert a.parent2 not in ["Klarka", "Jask"]
 
 
 def test_monday_afternoon_disabled_shifts(sample_config):
@@ -115,7 +118,8 @@ def test_early_week_couple_policy(sample_config):
         "Vit": "Eva", "Eva": "Vit",
         "Ales": "Zuzka", "Zuzka": "Ales",
         "Harry": "Klara", "Klara": "Harry",
-        "David": "Bara", "Bara": "David"
+        "David": "Bara", "Bara": "David",
+        "Klarka": "Jask", "Jask": "Klarka"
     }
 
     for a in assignments:
@@ -162,3 +166,21 @@ def test_partial_regeneration_locked_slots(sample_config):
     sun_shift_0 = next(a for a in assignments if a.day == "Sun" and a.shift_id == 0)
     assert set([sun_shift_0.parent1, sun_shift_0.parent2]) == set(["Vit", "Ales"])
     assert sun_shift_0.locked is True
+
+
+def test_locked_days_preservation(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    baseline = scheduler.solve()
+
+    # Lock Sunday and Monday
+    locked = [a for a in baseline if a.day in ["Sun", "Mon"]]
+    for a in locked:
+        a.locked = True
+
+    new_schedule = scheduler.solve(locked_assignments=locked)
+
+    baseline_sun_mon = {(a.day, a.shift_id): (a.parent1, a.parent2) for a in baseline if a.day in ["Sun", "Mon"]}
+    new_sun_mon = {(a.day, a.shift_id): (a.parent1, a.parent2) for a in new_schedule if a.day in ["Sun", "Mon"]}
+
+    assert baseline_sun_mon == new_sun_mon
+
