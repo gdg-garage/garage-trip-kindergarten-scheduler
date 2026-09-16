@@ -22,10 +22,11 @@ def test_metrics_calculation(sample_config):
     assert len(report.assignments) == 24
     assert len(report.parent_metrics) == len(sample_config.parents)
 
-    # Verify total shifts assigned across all parents matches active shifts * 2 parents
+    # Verify total shifts assigned across all parents matches active slots
     active_assignments = [a for a in report.assignments if not a.disabled]
     total_assigned = sum(pm.total_shifts for pm in report.parent_metrics)
-    assert total_assigned == len(active_assignments) * 2
+    expected_total_slots = sum(len(a.parents) for a in active_assignments)
+    assert total_assigned == expected_total_slots
 
     # Verify morning + evening shifts equal total shifts for each parent
     for pm in report.parent_metrics:

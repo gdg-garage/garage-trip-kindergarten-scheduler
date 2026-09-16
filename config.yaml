@@ -58,11 +58,14 @@ schedule:
       start: "16:00"
       end: "18:00"
   parents_per_shift: 2
+  parents_per_shift_by_day:
+    Thu: 3
+    Fri: 3
   disabled_shifts:
     - day: "Mon"
       shift_ids: [2, 3]  # Monday afternoon (Shifts 3 & 4) cancelled for Outdoor Puzzle Hunt
       reason: "OUTDOOR PUZZLE HUNT"
-  locked_days: ["Sun", "Mon"]  # Preserve existing plan for yesterday and today
+  locked_days: ["Sun", "Mon", "Tue", "Wed"]  # Freeze Sun-Wed, regenerate starting tomorrow (Thu-Fri)
 
 constraints:
   max_shifts_per_day: 2
@@ -84,3 +87,4 @@ google_sheets:
   time_col: "Time"
   parent1_col: "Parent 1"
   parent2_col: "Parent 2"
+  parent3_col: "Parent 3"

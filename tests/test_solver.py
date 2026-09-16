@@ -184,3 +184,18 @@ def test_locked_days_preservation(sample_config):
 
     assert baseline_sun_mon == new_sun_mon
 
+
+def test_three_parents_per_shift_thu_fri(sample_config):
+    scheduler = KindergartenScheduler(sample_config)
+    assignments = scheduler.solve()
+
+    for a in assignments:
+        if a.disabled:
+            continue
+        if a.day in ["Thu", "Fri"]:
+            assert len(a.parents) == 3, f"Expected 3 parents on {a.day} shift {a.shift_id}, got {a.parents}"
+            assert a.parent1 and a.parent2 and a.parent3
+        elif a.day in ["Sun", "Tue", "Wed"]:
+            assert len(a.parents) == 2, f"Expected 2 parents on {a.day} shift {a.shift_id}, got {a.parents}"
+
+

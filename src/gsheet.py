@@ -61,18 +61,25 @@ def assignments_to_30min_rows(
                     "Day": day,
                     "Time": "13:00 - 13:30",
                     "Parent 1": "LUNCH BREAK",
-                    "Parent 2": "LUNCH BREAK"
+                    "Parent 2": "LUNCH BREAK",
+                    "Parent 3": "LUNCH BREAK"
                 })
                 rows.append({
                     "Day": day,
                     "Time": "13:30 - 14:00",
                     "Parent 1": "LUNCH BREAK",
-                    "Parent 2": "LUNCH BREAK"
+                    "Parent 2": "LUNCH BREAK",
+                    "Parent 3": "LUNCH BREAK"
                 })
 
             assignment = assignment_map.get((day, s.id))
             p1 = assignment.parent1 if assignment else ""
             p2 = assignment.parent2 if assignment else ""
+            p3 = assignment.parent3 if assignment else ""
+            if assignment and assignment.parents:
+                p1 = assignment.parents[0] if len(assignment.parents) > 0 else ""
+                p2 = assignment.parents[1] if len(assignment.parents) > 1 else ""
+                p3 = assignment.parents[2] if len(assignment.parents) > 2 else ""
 
             sub_slots = _generate_30min_slots_for_shift(s)
             for start_t, end_t in sub_slots:
@@ -80,7 +87,8 @@ def assignments_to_30min_rows(
                     "Day": day,
                     "Time": f"{start_t} - {end_t}",
                     "Parent 1": p1,
-                    "Parent 2": p2
+                    "Parent 2": p2,
+                    "Parent 3": p3
                 })
 
     return rows
@@ -95,18 +103,20 @@ def parse_30min_rows_to_assignments(
     Detects pre-filled/locked slots vs unassigned/empty slots.
     """
     # Group rows by Day and Shift ID based on time range
-    slot_parents: Dict[Tuple[str, int], List[Tuple[str, str]]] = {}
+    slot_parents: Dict[Tuple[str, int], List[Tuple[str, str, str]]] = {}
 
     for row in rows:
         day = row.get("Day", "").strip()
         time_slot = row.get("Time", "").strip()
         p1 = row.get("Parent 1", "").strip()
         p2 = row.get("Parent 2", "").strip()
+        p3 = row.get("Parent 3", "").strip()
 
         if (
             not day
             or any(kw in p1.upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
             or any(kw in p2.upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+            or any(kw in p3.upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
         ):
             continue
 
@@ -124,7 +134,7 @@ def parse_30min_rows_to_assignments(
             key = (day, matched_shift.id)
             if key not in slot_parents:
                 slot_parents[key] = []
-            slot_parents[key].append((p1, p2))
+            slot_parents[key].append((p1, p2, p3))
 
     disabled_map = {}
     for d_rule in config.schedule.disabled_shifts:
@@ -147,6 +157,8 @@ def parse_30min_rows_to_assignments(
                         end=s.end,
                         parent1=reason_text,
                         parent2=reason_text,
+                        parent3=reason_text,
+                        parents=[reason_text, reason_text],
                         locked=True,
                         disabled=True,
                         reason=reason_text
@@ -159,17 +171,23 @@ def parse_30min_rows_to_assignments(
             # Aggregate parents from 30min rows
             p1_candidates = [
                 pair[0] for pair in parent_pairs
-                if pair[0] and not any(kw in pair[0].upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+                if len(pair) > 0 and pair[0] and not any(kw in pair[0].upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
             ]
             p2_candidates = [
                 pair[1] for pair in parent_pairs
-                if pair[1] and not any(kw in pair[1].upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+                if len(pair) > 1 and pair[1] and not any(kw in pair[1].upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
+            ]
+            p3_candidates = [
+                pair[2] for pair in parent_pairs
+                if len(pair) > 2 and pair[2] and not any(kw in pair[2].upper() for kw in ["LUNCH", "PUZZLE", "CANCELLED", "NO SHIFT"])
             ]
 
             p1 = p1_candidates[0] if p1_candidates else ""
             p2 = p2_candidates[0] if p2_candidates else ""
+            p3 = p3_candidates[0] if p3_candidates else ""
+            parents_list = [p for p in [p1, p2, p3] if p]
 
-            is_locked = bool(p1 and p2)
+            is_locked = bool(parents_list)
 
             assignments.append(
                 ShiftAssignment(
@@ -180,6 +198,8 @@ def parse_30min_rows_to_assignments(
                     end=s.end,
                     parent1=p1,
                     parent2=p2,
+                    parent3=p3,
+                    parents=parents_list,
                     locked=is_locked,
                     disabled=False
                 )
@@ -191,10 +211,15 @@ def parse_30min_rows_to_assignments(
 def export_to_csv(assignments: List[ShiftAssignment], file_path: str, config: ScheduleConfig):
     """Exports assignments to a CSV file structured by 30-minute rows."""
     rows = assignments_to_30min_rows(assignments, config)
+    has_p3 = any(r.get("Parent 3") for r in rows) or any(
+        config.schedule.get_parents_per_shift_for_day(d) > 2 for d in config.schedule.days
+    )
     fieldnames = ["Day", "Time", "Parent 1", "Parent 2"]
+    if has_p3:
+        fieldnames.append("Parent 3")
 
     with open(file_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -298,8 +323,15 @@ class GoogleSheetHandler:
             worksheet = spreadsheet.add_worksheet(title=sheet_name, rows="200", cols="10")
 
         rows = assignments_to_30min_rows(assignments, config)
+        has_p3 = any(r.get("Parent 3") for r in rows) or any(
+            config.schedule.get_parents_per_shift_for_day(d) > 2 for d in config.schedule.days
+        )
         header = ["Day", "Time", "Parent 1", "Parent 2"]
-        table_data = [header] + [[r["Day"], r["Time"], r["Parent 1"], r["Parent 2"]] for r in rows]
+        if has_p3:
+            header.append("Parent 3")
+            table_data = [header] + [[r["Day"], r["Time"], r["Parent 1"], r["Parent 2"], r.get("Parent 3", "")] for r in rows]
+        else:
+            table_data = [header] + [[r["Day"], r["Time"], r["Parent 1"], r["Parent 2"]] for r in rows]
 
         worksheet.clear()
         worksheet.update("A1", table_data)

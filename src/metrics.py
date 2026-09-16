@@ -34,31 +34,26 @@ def calculate_metrics(assignments: List[ShiftAssignment], config: ScheduleConfig
             pair_counts[(parent_names[i], parent_names[j])] = 0
 
     for a in assignments:
-        p1, p2 = a.parent1, a.parent2
+        if a.disabled:
+            continue
+        parents_in_shift = [p for p in (a.parents if a.parents else [a.parent1, a.parent2, a.parent3]) if p and p in shift_counts]
         hours = 2.0
         is_morning = a.shift_id in [0, 1]
         is_evening = a.shift_id in [2, 3]
 
-        if p1 in shift_counts:
-            shift_counts[p1] += 1
-            shift_hours[p1] += hours
+        for p in parents_in_shift:
+            shift_counts[p] += 1
+            shift_hours[p] += hours
             if is_morning:
-                morning_counts[p1] += 1
+                morning_counts[p] += 1
             elif is_evening:
-                evening_counts[p1] += 1
+                evening_counts[p] += 1
 
-        if p2 in shift_counts:
-            shift_counts[p2] += 1
-            shift_hours[p2] += hours
-            if is_morning:
-                morning_counts[p2] += 1
-            elif is_evening:
-                evening_counts[p2] += 1
-
-        if p1 and p2 and p1 != p2:
-            pair_key = tuple(sorted([p1, p2]))
-            if pair_key in pair_counts:
-                pair_counts[pair_key] += 1
+        for i in range(len(parents_in_shift)):
+            for j in range(i + 1, len(parents_in_shift)):
+                pair_key = tuple(sorted([parents_in_shift[i], parents_in_shift[j]]))
+                if pair_key in pair_counts:
+                    pair_counts[pair_key] += 1
 
     parent_metrics_list: List[ParentMetrics] = []
     ratios: List[float] = []

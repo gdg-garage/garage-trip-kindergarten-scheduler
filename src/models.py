@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Tuple
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ShiftRestriction(BaseModel):
@@ -26,8 +26,12 @@ class ScheduleSettings(BaseModel):
     days: List[str]
     shift_blocks: List[ShiftBlock]
     parents_per_shift: int = 2
+    parents_per_shift_by_day: Dict[str, int] = Field(default_factory=dict)
     disabled_shifts: List[ShiftRestriction] = Field(default_factory=list)
     locked_days: List[str] = Field(default_factory=list)
+
+    def get_parents_per_shift_for_day(self, day: str) -> int:
+        return self.parents_per_shift_by_day.get(day, self.parents_per_shift)
 
 
 class CouplePolicy(BaseModel):
@@ -57,6 +61,7 @@ class GSheetConfig(BaseModel):
     time_col: str = "Time"
     parent1_col: str = "Parent 1"
     parent2_col: str = "Parent 2"
+    parent3_col: str = "Parent 3"
 
 
 class ScheduleConfig(BaseModel):
@@ -72,11 +77,26 @@ class ShiftAssignment(BaseModel):
     shift_name: str
     start: str
     end: str
-    parent1: str
-    parent2: str
+    parent1: str = ""
+    parent2: str = ""
+    parent3: str = ""
+    parents: List[str] = Field(default_factory=list)
     locked: bool = False
     disabled: bool = False
     reason: Optional[str] = None
+
+    @model_validator(mode="after")
+    def sync_parents(self):
+        if not self.parents:
+            self.parents = [p for p in [self.parent1, self.parent2, self.parent3] if p]
+        else:
+            if len(self.parents) > 0 and not self.parent1:
+                self.parent1 = self.parents[0]
+            if len(self.parents) > 1 and not self.parent2:
+                self.parent2 = self.parents[1]
+            if len(self.parents) > 2 and not self.parent3:
+                self.parent3 = self.parents[2]
+        return self
 
 
 class ParentMetrics(BaseModel):

@@ -56,10 +56,10 @@ class KindergartenScheduler:
                     continue
                 key = (assignment.day, assignment.shift_id)
                 parents_in_slot = []
-                if assignment.parent1 and assignment.parent1 in self.parents:
-                    parents_in_slot.append(assignment.parent1)
-                if assignment.parent2 and assignment.parent2 in self.parents:
-                    parents_in_slot.append(assignment.parent2)
+                assigned_candidates = assignment.parents if assignment.parents else [assignment.parent1, assignment.parent2, assignment.parent3]
+                for p in assigned_candidates:
+                    if p and p in self.parents and p not in parents_in_slot:
+                        parents_in_slot.append(p)
                 if parents_in_slot:
                     locked_map[key] = parents_in_slot
 
@@ -72,13 +72,16 @@ class KindergartenScheduler:
 
         # HARD CONSTRAINTS
 
-        # 1. Capacity: Exactly parents_per_shift assigned to active shifts, 0 for disabled shifts
+        # 1. Capacity: Exactly required parents assigned to active shifts, 0 for disabled shifts
         for d in self.days:
+            req_parents = self.config.schedule.get_parents_per_shift_for_day(d)
             for s in self.shifts:
                 if (d, s.id) in disabled_map:
                     model.Add(sum(x[(d, s.id, p)] for p in self.parents) == 0)
+                elif (d, s.id) in locked_map:
+                    model.Add(sum(x[(d, s.id, p)] for p in self.parents) == len(locked_map[(d, s.id)]))
                 else:
-                    model.Add(sum(x[(d, s.id, p)] for p in self.parents) == self.parents_per_shift)
+                    model.Add(sum(x[(d, s.id, p)] for p in self.parents) == req_parents)
 
         # 2. Availability & Shift Restrictions constraint
         total_available_slots_per_parent = {}
@@ -138,7 +141,15 @@ class KindergartenScheduler:
         objective_terms = []
 
         # A. Fairness Objective: Minimize deviation from expected share of shifts
-        total_slots_needed = sum(1 for d in self.days for s in self.shifts if (d, s.id) not in disabled_map) * self.parents_per_shift
+        total_slots_needed = 0
+        for d in self.days:
+            req_parents = self.config.schedule.get_parents_per_shift_for_day(d)
+            for s in self.shifts:
+                if (d, s.id) not in disabled_map:
+                    if (d, s.id) in locked_map:
+                        total_slots_needed += len(locked_map[(d, s.id)])
+                    else:
+                        total_slots_needed += req_parents
         total_all_avail_slots = sum(total_available_slots_per_parent.values())
         ratio = total_slots_needed / max(1, total_all_avail_slots)
 
@@ -245,6 +256,8 @@ class KindergartenScheduler:
                             end=s.end,
                             parent1=reason_text,
                             parent2=reason_text,
+                            parent3=reason_text,
+                            parents=[reason_text, reason_text],
                             locked=True,
                             disabled=True,
                             reason=reason_text,
@@ -254,6 +267,7 @@ class KindergartenScheduler:
                     assigned_parents = [p for p in self.parents if solver.Value(x[(d, s.id, p)]) == 1]
                     p1 = assigned_parents[0] if len(assigned_parents) > 0 else ""
                     p2 = assigned_parents[1] if len(assigned_parents) > 1 else ""
+                    p3 = assigned_parents[2] if len(assigned_parents) > 2 else ""
 
                     is_locked = (d, s.id) in locked_map and set(assigned_parents) == set(locked_map[(d, s.id)])
 
@@ -266,6 +280,8 @@ class KindergartenScheduler:
                             end=s.end,
                             parent1=p1,
                             parent2=p2,
+                            parent3=p3,
+                            parents=assigned_parents,
                             locked=is_locked,
                             disabled=False,
                         )
